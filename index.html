@@ -36,7 +36,25 @@ function parseTime(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
 function minToStr(m){ return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
 function gapsFromLessons(slots){ const res=[]; if(slots.length<2) return res; for(let i=0;i<slots.length-1;i++){ const a=slots[i].end, b=slots[i+1].start; if(b-a>=10) res.push({start:a,end:b}); } return res; }
 function intersectIntervals(A,B){ const out=[]; let i=0,j=0; while(i<A.length && j<B.length){ const s=Math.max(A[i].start,B[j].start), e=Math.min(A[i].end,B[j].end); if(e-s>=10) out.push({start:s,end:e}); if(A[i].end < B[j].end) i++; else j++; } return out; }
-async function fetchPlan(id){ const r = await fetch(WORKER_BASE + '/parseUZ?id='+encodeURIComponent(id)+'&tz=Europe/Warsaw'); if(!r.ok) throw new Error('Błąd '+r.status); const j=await r.json(); const days={}; for(const k in j.days){ days[k]=j.days[k].map(([a,b])=>({start:parseTime(a),end:parseTime(b)})).sort((p,q)=>p.start-q.start);} return days; }
+async function fetchPlan(id) {
+  const url = `${WORKER_BASE}/parseUZ?id=${encodeURIComponent(id)}&tz=Europe/Warsaw`;
+  console.log("GET", url);
+  const r = await fetch(url);
+  const ct = r.headers.get("content-type") || "";
+  const text = await r.text();
+  if (!ct.includes("application/json")) {
+    throw new Error(`Worker zwrócił nie-JSON: ${text}`);
+  }
+  const j = JSON.parse(text);
+  const days = {};
+  for (const k in j.days) {
+    days[k] = j.days[k]
+      .map(([a, b]) => ({ start: parseTime(a), end: parseTime(b) }))
+      .sort((p, q) => p.start - q.start);
+  }
+  return days;
+}
+
 function renderTable(container, planA, planB){
   const daysIdx=[0,1,2,3,4]; const dayName=['Poniedziałek','Wtorek','Środa','Czwartek','Piątek'];
   let html='<div class="grid hl"><div></div>'+daysIdx.map(d=>'<div>'+dayName[d]+'</div>').join('')+'</div>';
