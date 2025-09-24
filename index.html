@@ -60,13 +60,17 @@ function renderTable(container, planA, planB){
   html+='</div>'; container.innerHTML=html; container.style.display='block';
 }
 async function boot(){
-  document.getElementById('labelA').textContent=GROUP_A; document.getElementById('labelB').textContent=GROUP_B;
-  const status=document.getElementById('status'); const results=document.getElementById('results');
-  status.textContent='Ładowanie planu...';
-  try{ const [A,B]=await Promise.all([fetchPlan(GROUP_A), fetchPlan(GROUP_B)]); renderTable(results,A,B); status.textContent='Gotowe. (Tydzień wg sobotniego przełączenia)'; }
-  catch(e){ status.innerHTML='<span style="color:#fecaca">Błąd: '+(e.message||e)+'</span>'; }
-}
-window.addEventListener('load', boot);
+    const status = document.getElementById('status');
+    const results = document.getElementById('results');
+    try {
+      const [A,B] = await Promise.all([fetchPlan("30197"), fetchPlan("30214")]);
+      renderTable(results, A, B);
+      status.textContent = 'Gotowe.';
+    } catch(e) {
+      status.textContent = 'Błąd: ' + (e.message||e);
+    }
+  }
+  window.addEventListener('load', boot);
 </script>
 </body>
 </html>
