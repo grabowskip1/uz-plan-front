@@ -1,0 +1,1 @@
+self.addEventListener('install',e=>e.waitUntil(caches.open('v1').then(c=>c.addAll(['/','/index.html','/manifest.json','/icon-512.png']))));self.addEventListener('fetch',e=>e.respondWith(fetch(e.request).catch(()=>caches.match(new URL(e.request.url).pathname).then(r=>r||caches.match('/index.html')))));
