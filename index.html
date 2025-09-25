@@ -2,93 +2,168 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Wspólne przerwy</title>
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#0f172a" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="apple-touch-icon" href="icon-512.png" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wspólne przerwy ID ↔ BT</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png" />
+  <meta name="theme-color" content="#ffffff">
   <style>
-    :root{color-scheme:light dark}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#0b1220;color:#e5e7eb}
-    header{padding:16px 20px;border-bottom:1px solid #243044;position:sticky;top:0;background:#0b1220}
-    main{padding:16px 20px;max-width:1024px;margin:0 auto}
-    .card{background:#111a2b;border:1px solid #243044;border-radius:16px;padding:16px;margin-top:16px}
-    .grid{display:grid;grid-template-columns:160px repeat(5,1fr);gap:8px;align-items:start}
-    .hl{font-weight:600}
-    .tag{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #334155;margin-right:6px;margin-bottom:6px}
-    .muted{opacity:.8}
-    .small{font-size:12px}
+    :root { color-scheme: light dark; }
+    body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:24px}
+    table{border-collapse:collapse;width:100%;table-layout:fixed}
+    th,td{border:1px solid #ddd;padding:8px;text-align:center;vertical-align:top;word-wrap:break-word}
+    th{background:#f5f5f5}
+    caption{margin-bottom:12px;font-weight:600}
+    small{color:#666}
+    .muted{color:#888;font-size:12px}
+    .tag{display:inline-block;border:1px solid #bbb;border-radius:6px;padding:2px 6px;margin:2px;font-variant-numeric:tabular-nums}
   </style>
 </head>
 <body>
-  <main>
-    <div id="status" class="small muted"></div>
-    <div id="results" class="card" style="display:none"></div>
-  </main>
+  <h1>Wspólne przerwy ID ↔ BT</h1>
+  <div id="meta" class="muted"></div>
+
+  <table id="grid">
+    <caption>Tydzień <span id="week"></span></caption>
+    <thead>
+      <tr>
+        <th></th>
+        <th>Poniedziałek</th>
+        <th>Wtorek</th>
+        <th>Środa</th>
+        <th>Czwartek</th>
+        <th>Piątek</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>Zaczynamy o</th>
+        <td id="s0"></td><td id="s1"></td><td id="s2"></td><td id="s3"></td><td id="s4"></td>
+      </tr>
+      <tr>
+        <th>Przerwa</th>
+        <td id="b0"></td><td id="b1"></td><td id="b2"></td><td id="b3"></td><td id="b4"></td>
+      </tr>
+      <tr>
+        <th>Przerwa</th>
+        <td id="b0b"></td><td id="b1b"></td><td id="b2b"></td><td id="b3b"></td><td id="b4b"></td>
+      </tr>
+      <tr>
+        <th>Koniec</th>
+        <td id="e0"></td><td id="e1"></td><td id="e2"></td><td id="e3"></td><td id="e4"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p><small>Źródło: plan.uz.zgora.pl (ID: 30197, BT: 30214, słownik: 2467). Odświeżanie po stronie Workera.</small></p>
+
 <script>
-const WORKER_BASE = "https://uz-plan.grabowski-piotrekk.workers.dev";
-const GROUP_A = "30197";
-const GROUP_B = "30214";
-if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js'); }
-function parseTime(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
-function minToStr(m){ return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
-function gapsFromLessons(slots){ const res=[]; if(slots.length<2) return res; for(let i=0;i<slots.length-1;i++){ const a=slots[i].end, b=slots[i+1].start; if(b-a>=10) res.push({start:a,end:b}); } return res; }
-function intersectIntervals(A,B){ const out=[]; let i=0,j=0; while(i<A.length && j<B.length){ const s=Math.max(A[i].start,B[j].start), e=Math.min(A[i].end,B[j].end); if(e-s>=10) out.push({start:s,end:e}); if(A[i].end < B[j].end) i++; else j++; } return out; }
-async function fetchPlan(id) {
-  const url = `${WORKER_BASE}/parseUZ?id=${encodeURIComponent(id)}&tz=Europe/Warsaw`;
-  console.log("GET", url);
-  const r = await fetch(url);
-  const ct = r.headers.get("content-type") || "";
-  const text = await r.text();
-  if (!ct.includes("application/json")) {
-    throw new Error(`Worker zwrócił nie-JSON: ${text}`);
+const WORKER_BASE = "https://YOUR-WORKER-SUBDOMAIN.workers.dev"; // ← podmień
+const GROUPS = { ID: "30197", BT: "30214", CAL: "2467" };
+const DAYS = ["Poniedziałek","Wtorek","Środa","Czwartek","Piątek"];
+
+main();
+
+async function main(){
+  registerSW();
+
+  const tz = "Europe/Warsaw";
+  const [idData, btData] = await Promise.all([
+    fetch(`${WORKER_BASE}/parseUZ?id=${GROUPS.ID}&cal=${GROUPS.CAL}&tz=${tz}`).then(r=>r.json()),
+    fetch(`${WORKER_BASE}/parseUZ?id=${GROUPS.BT}&cal=${GROUPS.CAL}&tz=${tz}`).then(r=>r.json()),
+  ]);
+
+  const week = nextWeekRangePL();
+  document.getElementById("week").textContent = `${week.mon}–${week.fri}`;
+  document.getElementById("meta").textContent = `Tydzień zaczynający się ${week.mon} (PL).`;
+
+  for (let d=0; d<5; d++){
+    const busyID = (idData.days?.[String(d)] ?? []).map(([s,e])=>({start:s,end:e}));
+    const busyBT = (btData.days?.[String(d)] ?? []).map(([s,e])=>({start:s,end:e}));
+
+    const startID = busyID[0]?.start || null;
+    const startBT = busyBT[0]?.start || null;
+    document.getElementById(`s${d}`).textContent = fmtStart(startID, startBT);
+
+    const endID = busyID.length ? busyID[busyID.length-1].end : null;
+    const endBT = busyBT.length ? busyBT[busyBT.length-1].end : null;
+    document.getElementById(`e${d}`).textContent = fmtEnd(endID, endBT);
+
+    const brID = toBreaks(busyID);
+    const brBT = toBreaks(busyBT);
+    const common = intersectBreaks(brID, brBT, 10); // min 10 min
+
+    fillBreakCell(`b${d}`, common[0]);
+    fillBreakCell(`b${d}b`, common[1]);
   }
-  const j = JSON.parse(text);
-  const days = {};
-  for (const k in j.days) {
-    days[k] = j.days[k]
-      .map(([a, b]) => ({ start: parseTime(a), end: parseTime(b) }))
-      .sort((p, q) => p.start - q.start);
-  }
-  return days;
 }
 
-function renderTable(container, planA, planB){
-  const daysIdx=[0,1,2,3,4]; const dayName=['Poniedziałek','Wtorek','Środa','Czwartek','Piątek'];
-  let html='<div class="grid hl"><div></div>'+daysIdx.map(d=>'<div>'+dayName[d]+'</div>').join('')+'</div>';
-  html+='<div class="grid"><div class="hl">Zaczynamy razem</div>';
-  for(const d of daysIdx){
-    const a=planA[d]||[], b=planB[d]||[]; const sA=a.length? a[0].start:null, sB=b.length? b[0].start:null;
-    html += (sA!=null && sB!=null && Math.abs(sA-sB)<=30) ? '<div>( '+minToStr(sA)+' '+minToStr(sB)+' )</div>' : '<div class="muted">—</div>';
-  }
-  html+='</div>';
-  html+='<div class="grid"><div class="hl">Przerwy</div>';
-  for(const d of daysIdx){
-    const ga=gapsFromLessons(planA[d]||[]), gb=gapsFromLessons(planB[d]||[]), ov=intersectIntervals(ga,gb);
-    html += '<div>' + (ov.length? ov.map(x=>'<span class="tag">'+minToStr(x.start)+'–'+minToStr(x.end)+'</span>').join(' ') : '<span class="muted">—</span>') + '</div>';
-  }
-  html+='</div>';
-  html+='<div class="grid"><div class="hl">Koniec</div>';
-  for(const d of daysIdx){
-    const a=planA[d]||[], b=planB[d]||[]; const eA=a.length? a[a.length-1].end:null, eB=b.length? b[b.length-1].end:null;
-    html += '<div>(ID '+(eA?minToStr(eA):'—')+') (BT '+(eB?minToStr(eB):'—')+')</div>';
-  }
-  html+='</div>'; container.innerHTML=html; container.style.display='block';
+function fillBreakCell(id, br){
+  const el = document.getElementById(id);
+  el.innerHTML = "";
+  if (!br){ el.textContent = "—"; return; }
+  const span = document.createElement("span");
+  span.className = "tag";
+  span.textContent = `${br.start}–${br.end}`;
+  el.appendChild(span);
 }
-async function boot(){
-    const status = document.getElementById('status');
-    const results = document.getElementById('results');
-    try {
-      const [A,B] = await Promise.all([fetchPlan("30197"), fetchPlan("30214")]);
-      renderTable(results, A, B);
-      status.textContent = 'Gotowe.';
-    } catch(e) {
-      status.textContent = 'Błąd: ' + (e.message||e);
-    }
+
+function fmtStart(a,b){
+  const A = a?`(ID - ${a})`:"(ID - —)";
+  const B = b?`(BT - ${b})`:"(BT - —)";
+  return `${A} ${B}`;
+}
+function fmtEnd(a,b){
+  const A = a?`(ID - ${a})`:"(ID - —)";
+  const B = b?`(BT - ${b})`:"(BT - —)";
+  return `${A} ${B}`;
+}
+
+function toBreaks(slots){
+  if (!slots || slots.length<2) return [];
+  const out=[];
+  for (let i=0;i<slots.length-1;i++){
+    const a=slots[i], b=slots[i+1];
+    if (toMin(b.start)>toMin(a.end)) out.push({start:a.end, end:b.start});
   }
-  window.addEventListener('load', boot);
+  return out;
+}
+
+function intersectBreaks(A,B,minMin){
+  const out=[]; let i=0,j=0;
+  while(i<A.length && j<B.length){
+    const s = Math.max(toMin(A[i].start), toMin(B[j].start));
+    const e = Math.min(toMin(A[i].end),   toMin(B[j].end));
+    if (e - s >= minMin) out.push({start:fromMin(s), end:fromMin(e)});
+    if (toMin(A[i].end) < toMin(B[j].end)) i++; else j++;
+  }
+  return out;
+}
+
+function toMin(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
+function fromMin(m){ const h=String(Math.floor(m/60)).padStart(2,"0"), mm=String(m%60).padStart(2,"0"); return `${h}:${mm}`; }
+
+function nextWeekRangePL(){
+  const tz="Europe/Warsaw";
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',weekday:'short'}).formatToParts(now);
+  const o = Object.fromEntries(parts.map(p=>[p.type,p.value]));
+  const wd = ["sun","mon","tue","wed","thu","fri","sat"].indexOf((o.weekday||"mon").toLowerCase().slice(0,3));
+  const dayIdx = wd===0?7:wd; // 1..7
+  const today = new Date(`${o.year}-${o.month}-${o.day}T00:00:00`);
+  const daysToNextMon = (8 - dayIdx) % 7 || 7;
+  const mon = addDays(today, daysToNextMon);
+  const fri = addDays(mon,4);
+  return { mon: iso(mon), fri: iso(fri) };
+}
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function iso(d){ return d.toISOString().slice(0,10); }
+
+function registerSW(){
+  if ("serviceWorker" in navigator){
+    navigator.serviceWorker.register("./sw.js").catch(()=>{});
+  }
+}
 </script>
 </body>
 </html>
