@@ -58,7 +58,7 @@
   <p><small>Źródło: plan.uz.zgora.pl (ID: 30197, BT: 30214, słownik: 2467). Odświeżanie po stronie Workera.</small></p>
 
 <script>
-const WORKER_BASE = "https://uz-plan.grabowski-piotrekk.workers.dev"; // ← podmień
+const WORKER_BASE = "https://uz-plan.grabowski-piotrekk.workers.dev";
 const GROUPS = { ID: "30197", BT: "30214", CAL: "2467" };
 const DAYS = ["Poniedziałek","Wtorek","Środa","Czwartek","Piątek"];
 
@@ -91,7 +91,7 @@ async function main(){
 
     const brID = toBreaks(busyID);
     const brBT = toBreaks(busyBT);
-    const common = intersectBreaks(brID, brBT, 10); // min 10 min
+    const common = intersectBreaks(brID, brBT, 10);
 
     fillBreakCell(`b${d}`, common[0]);
     fillBreakCell(`b${d}b`, common[1]);
